@@ -35,7 +35,8 @@
       }
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:var(--font);background:var(--bg3);color:var(--txt);min-height:100vh;padding-bottom:2rem;}
+    body{font-family:var(--font);background:var(--bg3);color:var(--txt);min-height:100vh;padding-bottom:2rem;overflow-x:hidden;width:100%;max-width:100vw;}
+    .wrap{max-width:100% !important;padding:1rem !important;}
     header{background:var(--bg);border-bottom:.5px solid var(--brd);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
     header h1{font-size:17px;font-weight:500;}
     .date-lbl{font-size:13px;color:var(--txt2);}
@@ -62,7 +63,8 @@
     .fbar{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
     .filt{font-size:13px;padding:4px 10px;border-radius:var(--r);cursor:pointer;border:.5px solid var(--brd2);background:transparent;color:var(--txt2);font-family:var(--font);}
     .filt.on{background:var(--bg2);color:var(--txt);}
-    .row{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+    .row{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;width:100%;}
+    input[type=text],input[type=date],select{max-width:100%;}
     input[type=text],input[type=date],input[type=number],select,textarea{
       font-family:var(--font);font-size:14px;color:var(--txt);background:var(--bg);
       border:.5px solid var(--brd2);border-radius:var(--r);padding:6px 10px;height:36px;outline:none;}
@@ -247,9 +249,9 @@ function showCD(id){
 }
 
 // ── TAREAS ───────────────────────────────────────────────
-function addTask(text,cat,pri,date,fromCal,location,desc,timeStart,timeEnd){
+function addTask(text,cat,pri,date,fromCal,location,desc,timeStart,timeEnd,uid){
   const v=text||document.getElementById('tInput').value.trim(); if(!v) return;
-  tasks.push({id:Date.now(),text:v,cat:cat||document.getElementById('tCat').value,pri:pri||document.getElementById('tPri').value,date:date||document.getElementById('tDate').value,done:false,fromCal:!!fromCal,location:location||'',desc:desc||'',timeStart:timeStart||null,timeEnd:timeEnd||null});
+  tasks.push({id:Date.now(),text:v,cat:cat||document.getElementById('tCat').value,pri:pri||document.getElementById('tPri').value,date:date||document.getElementById('tDate').value,done:false,fromCal:!!fromCal,location:location||'',desc:desc||'',timeStart:timeStart||null,timeEnd:timeEnd||null,uid:uid||null});
   if(!text){document.getElementById('tInput').value='';document.getElementById('tDate').value='';}
   save(); renderTasks(); checkAlerts();
 }
@@ -341,37 +343,33 @@ function renderSubjects(){
 // ── CALENDARIO ───────────────────────────────────────────
 function parseICSDate(s){
   if(!s) return {date:null,time:null};
-  s = s.trim();
-  const hasTime = s.includes('T');
-  if(!hasTime){
-    // Solo fecha: YYYYMMDD
-    return {date:`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`,time:null};
-  }
-  // Con hora: YYYYMMDDTHHMMSSZ o YYYYMMDDTHHMMSS
-  const y=s.slice(0,4),mo=s.slice(4,6),d=s.slice(6,8);
-  const hh=s.slice(9,11),mm=s.slice(11,13);
-  const isUTC=s.endsWith('Z');
-  const isoStr=`${y}-${mo}-${d}T${hh}:${mm}:00${isUTC?'Z':''}`;
-  const dt=new Date(isoStr);
-  const localDate=[
-    dt.getFullYear(),
-    String(dt.getMonth()+1).padStart(2,'0'),
-    String(dt.getDate()).padStart(2,'0')
-  ].join('-');
-  const localTime=String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
-  return {date:localDate,time:localTime};
+  s=s.trim();
+  if(!s.includes('T')) return {date:`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`,time:null};
+  const y=s.slice(0,4),mo=s.slice(4,6),d=s.slice(6,8),hh=s.slice(9,11),mm=s.slice(11,13);
+  const dt=new Date(`${y}-${mo}-${d}T${hh}:${mm}:00Z`);
+  const ld=[dt.getFullYear(),String(dt.getMonth()+1).padStart(2,'0'),String(dt.getDate()).padStart(2,'0')].join('-');
+  const lt=String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
+  return {date:ld,time:lt};
 }
 
 function parseICS(text){
+  // Unfold lines (RFC 5545: líneas que continúan empiezan con espacio o tab)
+  text=text.replace(/\r\n[ \t]/g,'').replace(/\n[ \t]/g,'');
   const blocks=text.split('BEGIN:VEVENT');
   const events=[];
   for(let i=1;i<blocks.length;i++){
     const b=blocks[i];
-    const get=k=>{const m=b.match(new RegExp(k+'[^:\\r\\n]*:([^\\r\\n]+)'));return m?m[1].trim().replace(/\\n/g,' ').replace(/\\,/g,','):''};
+    const get=k=>{
+      const m=b.match(new RegExp('(?:^|\\n)'+k+'[^:\\n]*:([^\\n]+)','m'));
+      return m?m[1].trim().replace(/\\n/g,' ').replace(/\\,/g,',').replace(/\\/g,''):'';
+    };
     const summary=get('SUMMARY');
+    const uid=get('UID');
     const {date,time:timeStart}=parseICSDate(get('DTSTART'));
     const {time:timeEnd}=parseICSDate(get('DTEND'));
-    if(summary&&date) events.push({summary,date,timeStart,timeEnd,location:get('LOCATION'),desc:get('DESCRIPTION').slice(0,100)});
+    // No mostrar hora fin si es igual a la de inicio
+    const tEnd=(timeEnd&&timeEnd!==timeStart)?timeEnd:null;
+    if(summary&&date) events.push({summary,date,timeStart,timeEnd:tEnd,location:get('LOCATION'),desc:get('DESCRIPTION').slice(0,100),uid});
   }
   return events.sort((a,b)=>a.date.localeCompare(b.date)||(a.timeStart||'').localeCompare(b.timeStart||''));
 }
@@ -425,9 +423,13 @@ function renderCalPreview(){
 }
 
 function importSel(){
+  let count=0;
   document.querySelectorAll('.ev-chk:checked').forEach(ch=>{
     const ev=pendingEvents[parseInt(ch.dataset.idx)];
-    if(ev) addTask(ev.summary,'academia','media',ev.date,true,ev.location,ev.desc,ev.timeStart,ev.timeEnd);
+    if(!ev) return;
+    // Evitar duplicados por UID
+    const exists=tasks.some(t=>t.uid&&t.uid===ev.uid);
+    if(!exists){addTask(ev.summary,'academia','media',ev.date,true,ev.location,ev.desc,ev.timeStart,ev.timeEnd,ev.uid);count++;}
   });
   sw('tareas',document.querySelector('.tab'));
   document.querySelector('.tab').classList.add('on');
