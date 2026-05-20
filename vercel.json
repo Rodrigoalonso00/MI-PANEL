@@ -1,5 +1,9 @@
 {
-  "rewrites": [
-    { "source": "/api/calendario", "destination": "/api/calendario.js" }
+  "version": 2,
+  "builds": [
+    { "src": "api/calendario.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/calendario", "dest": "/api/calendario.js" }
   ]
 }
