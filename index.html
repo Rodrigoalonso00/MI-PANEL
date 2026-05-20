@@ -527,7 +527,10 @@
   /* =========================================================
      ESTADO — puedes cambiar los datos por defecto aquí
   ========================================================= */
-  let tasks = [], notes = [], subjects = [], pendingEvents = [], curFilt = 'all';
+  let pendingEvents = [], curFilt = 'all';
+  let tasks    = JSON.parse(localStorage.getItem('mp_tasks')    || '[]');
+  let notes    = JSON.parse(localStorage.getItem('mp_notes')    || '[]');
+  let subjects = JSON.parse(localStorage.getItem('mp_subjects') || '[]');
 
   /* =========================================================
      UTILIDADES
@@ -554,9 +557,11 @@
   document.getElementById('headerDate').textContent =
     new Date().toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });
 
-  /* =========================================================
-     TABS
-  ========================================================= */
+  function save() {
+    localStorage.setItem('mp_tasks',    JSON.stringify(tasks));
+    localStorage.setItem('mp_notes',    JSON.stringify(notes));
+    localStorage.setItem('mp_subjects', JSON.stringify(subjects));
+  }
   function switchTab(id, el) {
     document.querySelectorAll('.sec').forEach(s => s.classList.remove('on'));
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
@@ -627,12 +632,13 @@
       document.getElementById('tInput').value = '';
       document.getElementById('tDate').value = '';
     }
+    save();
     renderTasks();
     checkAlerts();
   }
-  function toggleTask(id) { const t = tasks.find(t => t.id===id); if(t) t.done=!t.done; renderTasks(); }
-  function removeTask(id) { tasks = tasks.filter(t => t.id!==id); renderTasks(); }
-  function clearDone()    { tasks = tasks.filter(t => !t.done); renderTasks(); }
+  function toggleTask(id) { const t = tasks.find(t => t.id===id); if(t) t.done=!t.done; save(); renderTasks(); }
+  function removeTask(id) { tasks = tasks.filter(t => t.id!==id); save(); renderTasks(); }
+  function clearDone()    { tasks = tasks.filter(t => !t.done); save(); renderTasks(); }
 
   function renderTasks() {
     let vis = tasks;
@@ -704,9 +710,10 @@
     const tag = document.getElementById('noteTag').value;
     notes.unshift({ id: Date.now(), text: v, tag, time: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}) });
     document.getElementById('noteInput').value = '';
+    save();
     renderNotes();
   }
-  function removeNote(id) { notes = notes.filter(n => n.id !== id); renderNotes(); }
+  function removeNote(id) { notes = notes.filter(n => n.id !== id); save(); renderNotes(); }
 
   function renderNotes() {
     document.getElementById('nEmpty').style.display = notes.length ? 'none' : 'block';
@@ -735,26 +742,26 @@
     if (!n) return;
     subjects.push({ id: Date.now(), name: n, topics: [], open: true });
     document.getElementById('sName').value = '';
-    renderSubjects();
+    save(); renderSubjects();
   }
-  function removeSubj(id) { subjects = subjects.filter(s => s.id !== id); renderSubjects(); }
+  function removeSubj(id) { subjects = subjects.filter(s => s.id !== id); save(); renderSubjects(); }
   function toggleSubjOpen(id) { const s = subjects.find(s => s.id===id); if(s) s.open=!s.open; renderSubjects(); }
   function addTopic(sid) {
     const inp = document.getElementById('tinp-' + sid);
     const v = inp.value.trim(); if (!v) return;
     const s = subjects.find(s => s.id === sid);
     if (s) { s.topics.push({ id: Date.now(), text: v, done: false }); inp.value = ''; }
-    renderSubjects();
+    save(); renderSubjects();
   }
   function toggleTopic(sid, tid) {
     const s = subjects.find(s => s.id===sid); if(!s) return;
     const t = s.topics.find(t => t.id===tid); if(t) t.done=!t.done;
-    renderSubjects();
+    save(); renderSubjects();
   }
   function removeTopic(sid, tid) {
     const s = subjects.find(s => s.id===sid); if(!s) return;
     s.topics = s.topics.filter(t => t.id !== tid);
-    renderSubjects();
+    save(); renderSubjects();
   }
 
   function renderSubjects() {
