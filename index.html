@@ -286,6 +286,13 @@ function renderTasks(){
   else if(curFilt==='hecha')vis=tasks.filter(t=>t.done);
   else if(curFilt==='calendario')vis=tasks.filter(t=>t.fromCal);
   else if(['academia','gym','personal','trabajo','general'].includes(curFilt))vis=tasks.filter(t=>t.cat===curFilt);
+  // Ordenar cronológicamente: con fecha primero (más próxima antes), sin fecha al final
+  vis.sort((a,b)=>{
+    if(!a.date&&!b.date)return 0;
+    if(!a.date)return 1;
+    if(!b.date)return-1;
+    return a.date.localeCompare(b.date)||(a.timeStart||'').localeCompare(b.timeStart||'');
+  });
   document.getElementById('tEmpty').style.display=vis.length?'none':'block';
   document.getElementById('taskList').innerHTML=vis.map(t=>{
     const d=dl(t.date);
