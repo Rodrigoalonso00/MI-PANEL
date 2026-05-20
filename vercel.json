@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/api/calendario", "destination": "/api/calendario.js" }
+  ]
+}
