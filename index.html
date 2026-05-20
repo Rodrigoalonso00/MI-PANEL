@@ -812,10 +812,23 @@
   function parseICSDate(s) {
     if (!s) return { date: null, time: null };
     const hasTime = s.includes('T');
-    const base = s.replace(/[TZ]/g, '');
-    const date = `${base.slice(0,4)}-${base.slice(4,6)}-${base.slice(6,8)}`;
-    const time = hasTime ? `${base.slice(9,11)}:${base.slice(11,13)}` : null;
-    return { date, time };
+    const isUTC   = s.endsWith('Z');
+    const base    = s.replace(/[TZ]/g, '');
+    const y  = base.slice(0,4), mo = base.slice(4,6), d  = base.slice(6,8);
+    const hh = base.slice(9,11)||'00', mm = base.slice(11,13)||'00';
+
+    if (!hasTime) return { date: `${y}-${mo}-${d}`, time: null };
+
+    // Convertir a hora local
+    const dt = isUTC
+      ? new Date(`${y}-${mo}-${d}T${hh}:${mm}:00Z`)
+      : new Date(`${y}-${mo}-${d}T${hh}:${mm}:00`);
+
+    const localDate = dt.toLocaleDateString('es-ES', { year:'numeric', month:'2-digit', day:'2-digit' })
+      .split('/').reverse().join('-');
+    const localTime = dt.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
+
+    return { date: localDate, time: localTime };
   }
 
   function parseICS(text) {
@@ -910,6 +923,8 @@
   ========================================================= */
   setInterval(checkAlerts, 30000);
   renderTasks(); renderNotes(); renderSubjects();
+  // Sincronizar calendario automáticamente al abrir
+  fetchCalendar();
 </script>
 </body>
 </html>
