@@ -614,7 +614,7 @@
   /* =========================================================
      TAREAS
   ========================================================= */
-  function addTask(text, cat, pri, date, fromCal, location, desc) {
+  function addTask(text, cat, pri, date, fromCal, location, desc, timeStart, timeEnd) {
     const v = text || document.getElementById('tInput').value.trim();
     if (!v) return;
     tasks.push({
@@ -626,7 +626,9 @@
       done: false,
       fromCal: !!fromCal,
       location: location || '',
-      desc: desc || ''
+      desc: desc || '',
+      timeStart: timeStart || null,
+      timeEnd: timeEnd || null
     });
     if (!text) {
       document.getElementById('tInput').value = '';
@@ -808,9 +810,12 @@
   const PROXY_URL = 'https://mi-panel-eta.vercel.app/api/calendario';
 
   function parseICSDate(s) {
-    if (!s) return null;
-    s = s.split('T')[0].trim();
-    return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+    if (!s) return { date: null, time: null };
+    const hasTime = s.includes('T');
+    const base = s.replace(/[TZ]/g, '');
+    const date = `${base.slice(0,4)}-${base.slice(4,6)}-${base.slice(6,8)}`;
+    const time = hasTime ? `${base.slice(9,11)}:${base.slice(11,13)}` : null;
+    return { date, time };
   }
 
   function parseICS(text) {
@@ -819,10 +824,17 @@
     for (let i = 1; i < blocks.length; i++) {
       const b = blocks[i];
       const get = k => { const m = b.match(new RegExp(k+'[^:\\r\\n]*:([^\\r\\n]+)')); return m ? m[1].trim().replace(/\\n/g,' ').replace(/\\,/g,',') : ''; };
-      const summary = get('SUMMARY'), date = parseICSDate(get('DTSTART'));
-      if (summary && date) events.push({ summary, date, location: get('LOCATION'), desc: get('DESCRIPTION').slice(0,100) });
+      const summary = get('SUMMARY');
+      const { date, time: timeStart } = parseICSDate(get('DTSTART'));
+      const { time: timeEnd }         = parseICSDate(get('DTEND'));
+      if (summary && date) events.push({
+        summary, date,
+        timeStart, timeEnd,
+        location: get('LOCATION'),
+        desc: get('DESCRIPTION').slice(0,100)
+      });
     }
-    return events.sort((a,b) => a.date.localeCompare(b.date));
+    return events.sort((a,b) => a.date.localeCompare(b.date) || (a.timeStart||'').localeCompare(b.timeStart||''));
   }
 
   async function fetchCalendar() {
@@ -861,23 +873,28 @@
         <i class="ti ti-download" aria-hidden="true"></i> Importar seleccionados
       </button>
     </div>` +
-    pendingEvents.map((ev,i) => `<div class="card" style="display:flex;align-items:flex-start;gap:10px;">
-      <input type="checkbox" class="ev-check" data-idx="${i}" checked style="width:16px;height:16px;margin-top:3px;cursor:pointer;" aria-label="Seleccionar evento"/>
-      <div style="flex:1;">
-        <div style="font-size:14px;font-weight:500;">${esc(ev.summary)}</div>
-        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">
-          <i class="ti ti-calendar" aria-hidden="true"></i> ${ev.date}${ev.location?' · '+esc(ev.location):''}
+    pendingEvents.map((ev,i) => {
+      const horario = ev.timeStart ? `${ev.timeStart}${ev.timeEnd ? ' – ' + ev.timeEnd : ''}` : '';
+      return `<div class="card" style="display:flex;align-items:flex-start;gap:10px;">
+        <input type="checkbox" class="ev-check" data-idx="${i}" checked style="width:16px;height:16px;margin-top:3px;cursor:pointer;" aria-label="Seleccionar evento"/>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:500;">${esc(ev.summary)}</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">
+            <i class="ti ti-calendar" aria-hidden="true"></i> ${ev.date}
+            ${horario ? `<span style="margin-left:6px;"><i class="ti ti-clock" aria-hidden="true"></i> ${horario}</span>` : ''}
+            ${ev.location ? ' · ' + esc(ev.location) : ''}
+          </div>
+          ${ev.desc ? `<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;">${esc(ev.desc)}</div>` : ''}
         </div>
-        ${ev.desc?`<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;">${esc(ev.desc)}</div>`:''}
-      </div>
-      ${cdBadge(daysLeft(ev.date))}
-    </div>`).join('');
+        ${cdBadge(daysLeft(ev.date))}
+      </div>`;
+    }).join('');
   }
 
   function importSelectedEvents() {
     document.querySelectorAll('.ev-check:checked').forEach(ch => {
       const ev = pendingEvents[parseInt(ch.dataset.idx)];
-      if (ev) addTask(ev.summary, 'academia', 'media', ev.date, true, ev.location, ev.desc);
+      if (ev) addTask(ev.summary, 'academia', 'media', ev.date, true, ev.location, ev.desc, ev.timeStart, ev.timeEnd);
     });
     switchTab('tareas', document.querySelector('.tab'));
     document.querySelector('.tab').classList.add('on');
