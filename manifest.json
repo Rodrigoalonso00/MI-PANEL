@@ -2,7 +2,7 @@
   "name": "Mi Panel de Estudiante",
   "short_name": "Mi Panel",
   "description": "Tareas, notas, estudio y calendario para estudiantes",
-  "start_url": "/",
+  "start_url": "https://rodrigoalonso00.github.io/mi-panel/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
@@ -21,4 +21,5 @@
       "purpose": "any maskable"
     }
   ]
+}
 }
