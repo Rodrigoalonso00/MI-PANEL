@@ -341,19 +341,24 @@ function renderSubjects(){
 // ── CALENDARIO ───────────────────────────────────────────
 function parseICSDate(s){
   if(!s) return {date:null,time:null};
-  const hasTime=s.includes('T');
+  s = s.trim();
+  const hasTime = s.includes('T');
+  if(!hasTime){
+    // Solo fecha: YYYYMMDD
+    return {date:`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`,time:null};
+  }
+  // Con hora: YYYYMMDDTHHMMSSZ o YYYYMMDDTHHMMSS
+  const y=s.slice(0,4),mo=s.slice(4,6),d=s.slice(6,8);
+  const hh=s.slice(9,11),mm=s.slice(11,13);
   const isUTC=s.endsWith('Z');
-  const base=s.replace(/[TZ]/g,'');
-  const y=base.slice(0,4),mo=base.slice(4,6),d=base.slice(6,8);
-  const hh=base.slice(9,11)||'00',mm=base.slice(11,13)||'00';
-  if(!hasTime) return {date:`${y}-${mo}-${d}`,time:null};
-  const dt=isUTC?new Date(`${y}-${mo}-${d}T${hh}:${mm}:00Z`):new Date(`${y}-${mo}-${d}T${hh}:${mm}:00`);
+  const isoStr=`${y}-${mo}-${d}T${hh}:${mm}:00${isUTC?'Z':''}`;
+  const dt=new Date(isoStr);
   const localDate=[
     dt.getFullYear(),
     String(dt.getMonth()+1).padStart(2,'0'),
     String(dt.getDate()).padStart(2,'0')
   ].join('-');
-  const localTime=dt.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  const localTime=String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
   return {date:localDate,time:localTime};
 }
 
